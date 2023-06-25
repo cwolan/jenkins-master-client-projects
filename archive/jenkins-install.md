@@ -1,12 +1,12 @@
-## 1.0 Launch an Amazon Linux 2 instance and Configure Jenkins
+## 1️⃣ Launch an Amazon Linux 2 instance and Install Jenkins
 - name: Jenkins-Master
 - machine type: t2.medium
 - image/ami: Amazon Linux 2
 - Key pair: Select or Create
 - Security group ports: 8080, 22
  
- ### Login and Install Jenkins
- ```
+ ## 2️⃣ Login and Install Jenkins
+ ```bash
 #!/bin/bash
 sudo su
 yum update –y
@@ -22,13 +22,13 @@ systemctl start jenkins
 yum install git -y
  ```
 
-### Configure Master and Clinet Configuration
+## 3️⃣ Configure Master and Clinet Configuration
 - Click on "Manage Jenkins" >> Click "Nodes and Cloud" >> Click "New Node"
 - Click `New Node`
     - Node name: `Maven-Build-Env` 
     - Type: `Permanent Agent` >> Click `CREATE`
 
-#### 1. Configure "Maven-Build-Env"
+#### 3.1. Configure "Maven-Build-Env"
 - Name:                  `Maven-Build-Env`
 - Number of Executors:   `5` (for example, maximum jobs to execute at a time)
 - Remote root directory: `/opt/maven-builds`
@@ -67,7 +67,7 @@ yum install git -y
 - NOTE: Make sure the `Agent Status` shows `Agent successfully connected and online` on the Logs
 - NOTE: Repeat the process for adding additional Nodes
 
-#### 2. Configure "Gradle-Build-Env"
+#### 3.2. Configure "Gradle-Build-Env"
 - Click `New Node`
     - Node name: `Gradle-Build-Env` 
     - Type: `Permanent Agent` >> Click `CREATE`
@@ -101,7 +101,7 @@ yum install git -y
         - Click `Add`
         - 1st Variable:
             - Name: `GRADLE_HOME`
-            - Value: `/opt/gradle-6.8.3`
+            - Value: `/opt/gradle/gradle-6.8.3`
         - 2nd Variable:
             - Name: `PATH`
             - Value: `$GRADLE_HOME/bin:$PATH`
@@ -110,7 +110,7 @@ yum install git -y
 - NOTE: Make sure the `Agent Status` shows `Agent successfully connected and online` on the Logs
 - NOTE: Repeat the process for adding additional Nodes
 
-## Plugin Installation Before Job Creation
+## 4️⃣ Plugin Installation Before Job Creation
 - Install: `Delivery Pipeline` plugin
     - Click on `Dashboard` on Jenkins
     - Click on The `+` on your Jenkins Dashboard and Configure the View
@@ -120,19 +120,109 @@ yum install git -y
         - Initial Job: Select either the `Maven Build Job or 1st Job` or `Gradle Build Job or 1st Job`
     - APPLY and SAVE
 
-## CREATE PIPELINE JOBS
+## 5️⃣ CREATE PROJECT PIPELINE JOBS
 
-### 1. Create Maven Build, Test and Deploy Job
+### 5.1. Create Maven Build, Test and Deploy Job
+###### Maven Build Job
+- Click on `New Item`
+    - Name: `Maven-Continuous-Integration-Pipeline-Build`
+    - Type: `Freestyle`
+    - Click: `OK`
+        - Select: `GitHub project`, Project url: `YOUR_MAVEN_PROJECT_REPOSITORY`
+    - Select `Restrict where this project can be run:`, Label Expression: `Maven-Build-Env`
+    - Select `Git`, Repository URL: `YOUR_MAVEN_PROJECT_REPOSITORY`
+    - Branches to build: `*/main` or `master`
+    - Build Steps: `Execute Shell`
+        - Command: `mvn clean build`
+    - `APPLY` and `SAVE`
 
-### 2. Create Gradle Build, Test and Deploy Job
+###### Maven SonarQube Test Job
+- Click on `New Item`
+    - Name: `Maven-Continuous-Integration-Pipeline-SonarQube-Test`
+    - Type: `Freestyle`
+    - Click: `OK`
+        - Select: `GitHub project`, Project url: `YOUR_MAVEN_PROJECT_REPOSITORY`
+    - Select `Restrict where this project can be run:`, Label Expression: `Maven-Build-Env`
+    - Select `Git`, Repository URL: `YOUR_MAVEN_PROJECT_REPOSITORY`
+    - Branches to build: `*/main` or `master`
+    - Build Steps: `Execute Shell`
+        - Command:
+          """mvn sonar:sonar \
+                -Dsonar.projectKey=Maven-JavaWebApp-Analysis \
+                -Dsonar.host.url=http://PROVIDE_PRIVATE_IP:9000 \
+                -Dsonar.login=SONARQUBE_PROJECT_AUTHORIZATION_TOKEN"""
+    - `APPLY` and `SAVE`
 
-## JOB INTEGRATION
+###### Maven Nexus Upload Job
+- Click on `New Item`
+    - Name: `Maven-Continuous-Integration-Pipeline-Nexus-Upload`
+    - Type: `Freestyle`
+    - Click: `OK`
+        - Select: `GitHub project`, Project url: `YOUR_MAVEN_PROJECT_REPOSITORY`
+    - Select `Restrict where this project can be run:`, Label Expression: `Maven-Build-Env`
+    - Select `Git`, Repository URL: `YOUR_MAVEN_PROJECT_REPOSITORY`
+    - Branches to build: `*/main` or `master`
+    - Build Steps: `Execute Shell`
+        - Command: 
+          `mvn deploy`
+    
+    - `APPLY` and `SAVE`
 
-### Integrate The Maven JOBS Together To Create a CI Pipeline
+### 5.2. Create Gradle Build, Test and Deploy Job
+###### Gradle Build Job
+- Click on `New Item`
+    - Name: `Gradle-Continuous-Integration-Pipeline-Build`
+    - Type: `Freestyle`
+    - Click: `OK`
+        - Select: `GitHub project`, Project url: `YOUR_GRADLE_PROJECT_REPOSITORY`
+    - Select `Restrict where this project can be run:`, Label Expression: `Gradle-Build-Env`
+    - Select `Git`, Repository URL: `YOUR_GRADLE_PROJECT_REPOSITORY`
+    - Branches to build: `*/main` or `master`
+    - Build Steps: `Execute Shell`
+        - Command: `gradle clean build`
+    - `APPLY` and `SAVE`
 
-### Integrate The Gradle JOBS Together To Create a CI Pipeline
+###### Gradle SonarQube Test Job
+- Click on `New Item`
+    - Name: `Gradle-Continuous-Integration-Pipeline-SonarQube-Test`
+    - Type: `Freestyle`
+    - Click: `OK`
+        - Select: `GitHub project`, Project url: `YOUR_GRADLE_PROJECT_REPOSITORY`
+    - Select `Restrict where this project can be run:`, Label Expression: `Gradle-Build-Env`
+    - Select `Git`, Repository URL: `YOUR_GRADLE_PROJECT_REPOSITORY`
+    - Branches to build: `*/main` or `master`
+    - Build Steps: `Execute Shell`
+        - Command: `gradle sonarqube`
+    - `APPLY` and `SAVE`
 
-## TEST YOUR PIPELINE
+###### Gradle Nexus Deploy Job
+- Click on `New Item`
+    - Name: `Gradle-Continuous-Integration-Pipeline-Nexus-Upload`
+    - Type: `Freestyle`
+    - Click: `OK`
+        - Select: `GitHub project`, Project url: `YOUR_GRADLE_PROJECT_REPOSITORY`
+    - Select `Restrict where this project can be run:`, Label Expression: `Gradle-Build-Env`
+    - Select `Git`, Repository URL: `YOUR_GRADLE_PROJECT_REPOSITORY`
+    - Branches to build: `*/main` or `master`
+    - Build Steps: `Execute Shell`
+        - Command: `gradle publish`
+    - `APPLY` and `SAVE`
+
+## 6️⃣ JOB INTEGRATION
+
+### 6.1. Integrate The Maven JOBS Together To Create a CI Pipeline
+1. Click on your `First Job` > Click `Configure` 
+- Scroll to `Post-build Actions` Click `Add P-B-A` >> Projects to build "Select" `Second Job`
+2. Click on your `Second Job` > Click `Configure` 
+- Scroll to `Post-build Actions` Click `Add P-B-A` >> Projects to build "Select" `Third Job`
+
+### 6.2. Integrate The Gradle JOBS Together To Create a CI Pipeline
+1. Click on your `First Job` > Click `Configure` 
+- Scroll to `Post-build Actions` Click `Add P-B-A` >> Projects to build "Select" `Second Job`
+2. Click on your `Second Job` > Click `Configure` 
+- Scroll to `Post-build Actions` Click `Add P-B-A` >> Projects to build "Select" `Third Job`
+
+## 7️⃣ TEST YOUR PIPELINE
 
 
 
